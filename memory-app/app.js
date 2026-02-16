@@ -477,6 +477,18 @@ class MemoryApp {
       });
     }
 
+    const googleLoginBtn = document.getElementById('googleLoginBtn');
+    if (googleLoginBtn) {
+      googleLoginBtn.addEventListener('click', async () => {
+        const { error } = await syncModule.signInWithGoogle();
+        if (error) {
+          const errEl = document.getElementById('authError');
+          errEl.textContent = error.message;
+          errEl.style.display = 'block';
+        }
+      });
+    }
+
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
