@@ -286,6 +286,15 @@ class SupabaseSync {
                 const { data } = this.client.storage.from('card-images').getPublicUrl(rc.answer_image_path);
                 aImg = data.publicUrl;
                 console.log('[Sync Debug] Pull A-Image:', aImg);
+                console.log('[Sync Debug] Pull A-Image:', aImg);
+            }
+
+            // Restore local DataURL if remote has no image (protect existing unsynced images)
+            if (!qImg && localCard && localCard.questionImage && localCard.questionImage.startsWith('data:')) {
+                qImg = localCard.questionImage;
+            }
+            if (!aImg && localCard && localCard.answerImage && localCard.answerImage.startsWith('data:')) {
+                aImg = localCard.answerImage;
             }
 
             const remoteCard = {
@@ -411,6 +420,9 @@ class SupabaseSync {
             if (eventType === 'DELETE' || (newRow && newRow.deleted)) {
                 await db.cards.delete(oldRow?.id || newRow?.id);
             } else if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                // Get local card to preserve DataURL
+                const localCard = await db.cards.get(newRow.id);
+
                 // Resolve Image URLs
                 let qImg = '';
                 if (newRow.question_image_path) {
@@ -423,6 +435,16 @@ class SupabaseSync {
                     const { data } = this.client.storage.from('card-images').getPublicUrl(newRow.answer_image_path);
                     aImg = data.publicUrl;
                     console.log('[Sync Debug] A-Image URL:', aImg);
+                }
+
+
+
+                // Restore local DataURL if remote has no image
+                if (!qImg && localCard && localCard.questionImage && localCard.questionImage.startsWith('data:')) {
+                    qImg = localCard.questionImage;
+                }
+                if (!aImg && localCard && localCard.answerImage && localCard.answerImage.startsWith('data:')) {
+                    aImg = localCard.answerImage;
                 }
 
                 const card = {
