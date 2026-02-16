@@ -1,4 +1,4 @@
-const CACHE_NAME = 'anki-master-v2';
+const CACHE_NAME = 'anki-master-v3';
 const ASSETS = [
     './',
     './index.html',
