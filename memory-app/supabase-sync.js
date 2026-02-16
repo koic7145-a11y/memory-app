@@ -79,12 +79,36 @@ class SupabaseSync {
         return { data, error };
     }
 
+    async signInWithGoogle() {
+        if (!this.client) return { error: { message: 'Supabase未初期化' } };
+        const { data, error } = await this.client.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin + window.location.pathname
+            }
+        });
+        return { data, error };
+    }
+
     async signOut() {
         if (!this.client) return;
         this.unsubscribeRealtime();
         await this.client.auth.signOut();
         this.user = null;
         this._setSyncStatus('offline');
+    }
+
+    async deleteAccount() {
+        if (!this.client || !this.user) return { error: { message: 'Not logged in' } };
+        try {
+            const { data, error } = await this.client.rpc('delete_user');
+            if (error) throw error;
+            await this.signOut();
+            return { data };
+        } catch (e) {
+            console.error('[Sync] Delete account failed:', e);
+            return { error: e };
+        }
     }
 
     async getSession() {
@@ -111,6 +135,32 @@ class SupabaseSync {
         }
     }
 
+    // ─── Image Upload ───
+    async uploadImage(dataUrl) {
+        if (!dataUrl || !dataUrl.startsWith('data:image')) return null;
+
+        try {
+            // DataURL -> Blob
+            const res = await fetch(dataUrl);
+            const blob = await res.blob();
+            const ext = blob.type.split('/')[1] || 'jpg';
+            const fileName = `${this.user.id}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+
+            const { data, error } = await this.client.storage
+                .from('card-images')
+                .upload(fileName, blob, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (error) throw error;
+            return data.path;
+        } catch (e) {
+            console.error('[Sync] Image upload failed:', e);
+            return null;
+        }
+    }
+
     // ─── Push: Local → Supabase ───
     async pushChanges() {
         if (!this.client || !this.user) return;
@@ -121,25 +171,43 @@ class SupabaseSync {
             .toArray();
 
         if (unsyncedCards.length > 0) {
-            // Note: Image DataURLs can be very large (>1MB each).
-            // Supabase has a payload size limit, so we exclude images from sync
-            // and only sync metadata. Images remain in local IndexedDB.
-            const rows = unsyncedCards.map(card => ({
-                id: card.id,
-                user_id: this.user.id,
-                question: card.question || '',
-                answer: card.answer || '',
-                category: card.category || '未分類',
-                level: card.level || 0,
-                ease_factor: card.easeFactor || 2.5,
-                interval_days: card.interval || 0,
-                repetitions: card.repetitions || 0,
-                next_review: card.nextReview || null,
-                review_history: JSON.stringify(card.reviewHistory || []),
-                created_at: card.createdAt || new Date().toISOString(),
-                updated_at: card.updatedAt || new Date().toISOString(),
-                deleted: card.deleted === 1
-            }));
+            const rows = [];
+            for (const card of unsyncedCards) {
+                // Upload images if needed
+                let qPath = null;
+                let aPath = null;
+
+                // 既にアップロード済みのパスがある場合はそれを維持、DataURLならアップロード
+                if (card.questionImage && card.questionImage.startsWith('data:')) {
+                    qPath = await this.uploadImage(card.questionImage);
+                } else if (card.questionImage && !card.questionImage.startsWith('data:')) {
+                    // It might be a public URL or path, but we only store path in DB
+                    // For now, simpler to just re-upload or skip.
+                }
+
+                if (card.answerImage && card.answerImage.startsWith('data:')) {
+                    aPath = await this.uploadImage(card.answerImage);
+                }
+
+                rows.push({
+                    id: card.id,
+                    user_id: this.user.id,
+                    question: card.question || '',
+                    answer: card.answer || '',
+                    question_image_path: qPath,
+                    answer_image_path: aPath,
+                    category: card.category || '未分類',
+                    level: card.level || 0,
+                    ease_factor: card.easeFactor || 2.5,
+                    interval_days: card.interval || 0,
+                    repetitions: card.repetitions || 0,
+                    next_review: card.nextReview || null,
+                    review_history: JSON.stringify(card.reviewHistory || []),
+                    created_at: card.createdAt || new Date().toISOString(),
+                    updated_at: card.updatedAt || new Date().toISOString(),
+                    deleted: card.deleted === 1
+                });
+            }
 
             const { error } = await this.client
                 .from('cards')
@@ -147,7 +215,7 @@ class SupabaseSync {
 
             if (error) {
                 console.error('[Sync] Push cards failed:', error);
-                alert('[Sync Debug] Push cards failed: ' + JSON.stringify(error));
+                // alert('[Sync Debug] Push cards failed: ' + JSON.stringify(error));
             } else {
                 // Mark all as synced
                 const ids = unsyncedCards.map(c => c.id);
@@ -205,10 +273,24 @@ class SupabaseSync {
         for (const rc of remoteCards || []) {
             const localCard = await db.cards.get(rc.id);
 
+            // Resolve Image URLs
+            let qImg = '';
+            if (rc.question_image_path) {
+                const { data } = this.client.storage.from('card-images').getPublicUrl(rc.question_image_path);
+                qImg = data.publicUrl;
+            }
+            let aImg = '';
+            if (rc.answer_image_path) {
+                const { data } = this.client.storage.from('card-images').getPublicUrl(rc.answer_image_path);
+                aImg = data.publicUrl;
+            }
+
             const remoteCard = {
                 id: rc.id,
                 question: rc.question || '',
                 answer: rc.answer || '',
+                questionImage: qImg,
+                answerImage: aImg,
                 category: rc.category || '未分類',
                 level: rc.level || 0,
                 easeFactor: rc.ease_factor || 2.5,
@@ -326,10 +408,24 @@ class SupabaseSync {
             if (eventType === 'DELETE' || (newRow && newRow.deleted)) {
                 await db.cards.delete(oldRow?.id || newRow?.id);
             } else if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                // Resolve Image URLs
+                let qImg = '';
+                if (newRow.question_image_path) {
+                    const { data } = this.client.storage.from('card-images').getPublicUrl(newRow.question_image_path);
+                    qImg = data.publicUrl;
+                }
+                let aImg = '';
+                if (newRow.answer_image_path) {
+                    const { data } = this.client.storage.from('card-images').getPublicUrl(newRow.answer_image_path);
+                    aImg = data.publicUrl;
+                }
+
                 const card = {
                     id: newRow.id,
                     question: newRow.question || '',
                     answer: newRow.answer || '',
+                    questionImage: qImg,
+                    answerImage: aImg,
                     category: newRow.category || '未分類',
                     level: newRow.level || 0,
                     easeFactor: newRow.ease_factor || 2.5,
