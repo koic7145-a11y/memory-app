@@ -121,13 +121,16 @@ class SupabaseSync {
             .toArray();
 
         if (unsyncedCards.length > 0) {
+            // Note: Image DataURLs can be very large (>1MB each).
+            // Supabase has a payload size limit, so we exclude images from sync
+            // and only sync metadata. Images remain in local IndexedDB.
             const rows = unsyncedCards.map(card => ({
                 id: card.id,
                 user_id: this.user.id,
                 question: card.question || '',
                 answer: card.answer || '',
-                question_image: card.questionImage || null,
-                answer_image: card.answerImage || null,
+                question_image: null,
+                answer_image: null,
                 category: card.category || '未分類',
                 level: card.level || 0,
                 ease_factor: card.easeFactor || 2.5,
@@ -146,6 +149,7 @@ class SupabaseSync {
 
             if (error) {
                 console.error('[Sync] Push cards failed:', error);
+                alert('[Sync Debug] Push cards failed: ' + JSON.stringify(error));
             } else {
                 // Mark all as synced
                 const ids = unsyncedCards.map(c => c.id);
