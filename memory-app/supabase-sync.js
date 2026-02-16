@@ -279,11 +279,13 @@ class SupabaseSync {
             if (rc.question_image_path) {
                 const { data } = this.client.storage.from('card-images').getPublicUrl(rc.question_image_path);
                 qImg = data.publicUrl;
+                console.log('[Sync Debug] Pull Q-Image:', qImg);
             }
             let aImg = '';
             if (rc.answer_image_path) {
                 const { data } = this.client.storage.from('card-images').getPublicUrl(rc.answer_image_path);
                 aImg = data.publicUrl;
+                console.log('[Sync Debug] Pull A-Image:', aImg);
             }
 
             const remoteCard = {
@@ -414,11 +416,13 @@ class SupabaseSync {
                 if (newRow.question_image_path) {
                     const { data } = this.client.storage.from('card-images').getPublicUrl(newRow.question_image_path);
                     qImg = data.publicUrl;
+                    console.log('[Sync Debug] Q-Image URL:', qImg);
                 }
                 let aImg = '';
                 if (newRow.answer_image_path) {
                     const { data } = this.client.storage.from('card-images').getPublicUrl(newRow.answer_image_path);
                     aImg = data.publicUrl;
+                    console.log('[Sync Debug] A-Image URL:', aImg);
                 }
 
                 const card = {
