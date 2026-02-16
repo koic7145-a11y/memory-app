@@ -1179,3 +1179,150 @@ textarea.form-input {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* --- Settings Button & Modal --- */
+.header {
+  position: relative;
+}
+
+#settingsBtn {
+  position: absolute;
+  top: 32px;
+  right: 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  transition: var(--transition);
+  padding: 8px;
+  border-radius: 50%;
+  z-index: 10;
+}
+
+#settingsBtn:hover {
+  background-color: var(--gray-200);
+  color: var(--gray-600);
+}
+
+@media (max-width: 768px) {
+  #settingsBtn {
+    top: 24px;
+    right: 8px;
+  }
+}
+
+.modal-body p {
+  line-height: 1.6;
+}
+
+.setting-item h3 {
+  color: var(--gray-800);
+  font-weight: 600;
+}
+
+/* --- Optimized Settings Modal UX --- */
+.modal {
+  transition: opacity 0.15s ease-out !important;
+  /* Force faster transition */
+}
+
+/* Bottom Sheet for Mobile */
+@media (max-width: 640px) {
+  #settingsModal {
+    align-items: flex-end !important;
+    /* Align to bottom */
+    padding: 0 !important;
+  }
+
+  #settingsModal .modal-content {
+    width: 100%;
+    margin: 0;
+    border-radius: 24px 24px 0 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    transform: translateY(100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  /* When active, slide up */
+  #settingsModal.active .modal-content {
+    transform: translateY(0);
+    animation: none !important;
+    /* Disable any fade-in zoom */
+  }
+
+  #settingsModal .modal-header {
+    padding: 20px 24px 10px;
+  }
+
+  #settingsModal .modal-body {
+    padding: 10px 24px 40px;
+  }
+}
+
+/* --- Header Actions & Sync Indicator --- */
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  color: var(--gray-500);
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.sync-dot.synced {
+  background: #22c55e;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.4);
+}
+
+.sync-dot.syncing {
+  background: #3b82f6;
+  animation: sync-pulse 1s ease-in-out infinite;
+}
+
+.sync-dot.error {
+  background: #ef4444;
+}
+
+.sync-dot.offline {
+  background: var(--gray-400);
+}
+
+@keyframes sync-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
+.sync-text {
+  line-height: 1;
+}

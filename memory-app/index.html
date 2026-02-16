@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="icon.svg">
   <title>暗記マスター - エビングハウスの忘却曲線で効率的に記憶</title>
   <meta name="description" content="エビングハウスの忘却曲線に基づく暗記カードアプリ。効率的に記憶を定着させます。">
+  <meta name="robots" content="noindex, nofollow">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
@@ -29,6 +30,21 @@
         暗記マスター
       </h1>
       <p class="header-subtitle">エビングハウスの忘却曲線で効率的に記憶</p>
+      <div class="header-actions">
+        <span class="sync-indicator" id="syncIndicator" title="同期状態">
+          <span class="sync-dot offline"></span>
+          <span class="sync-text" id="syncText">未接続</span>
+        </span>
+        <button class="btn-icon" id="settingsBtn" aria-label="設定">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- ===== Stats Dashboard ===== -->
@@ -353,12 +369,81 @@
     </div>
   </div>
 
-  <!-- ===== Toast ===== -->
   <div class="toast" id="toast"></div>
+
+  <!-- ===== Settings Modal ===== -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>設定</h2>
+        <button class="modal-close" id="settingsCloseBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Sync / Auth Section -->
+        <div class="setting-item" id="syncSection"
+          style="margin-bottom: 2rem; background:var(--gray-50); padding:1rem; border-radius:var(--radius-md);">
+          <h3 style="font-size:1rem;margin-bottom:0.5rem;">☁️ クラウド同期</h3>
+
+          <!-- Not logged in -->
+          <div id="authFormSection">
+            <p style="margin-bottom:1rem;font-size:0.8rem;color:var(--gray-600);">
+              アカウントでログインすると、PC・スマホ間でデータが自動同期されます。
+            </p>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+              <button class="btn btn-sm" id="authTabLogin" style="flex:1;"
+                onclick="document.getElementById('authSignupFields').classList.add('hidden');document.getElementById('authTabLogin').classList.add('btn-primary');document.getElementById('authTabSignup').classList.remove('btn-primary');document.getElementById('authSubmitBtn').textContent='ログイン';document.getElementById('authSubmitBtn').dataset.mode='login';">ログイン</button>
+              <button class="btn btn-sm" id="authTabSignup" style="flex:1;"
+                onclick="document.getElementById('authSignupFields').classList.remove('hidden');document.getElementById('authTabSignup').classList.add('btn-primary');document.getElementById('authTabLogin').classList.remove('btn-primary');document.getElementById('authSubmitBtn').textContent='新規登録';document.getElementById('authSubmitBtn').dataset.mode='signup';">新規登録</button>
+            </div>
+            <input type="email" class="form-input" id="authEmail" placeholder="メールアドレス" style="margin-bottom:0.5rem;">
+            <input type="password" class="form-input" id="authPassword" placeholder="パスワード"
+              style="margin-bottom:0.5rem;">
+            <div id="authSignupFields" class="hidden">
+              <input type="password" class="form-input" id="authPasswordConfirm" placeholder="パスワード（確認）"
+                style="margin-bottom:0.5rem;">
+            </div>
+            <p id="authError" style="color:#ef4444;font-size:0.8rem;margin-bottom:0.5rem;display:none;"></p>
+            <button class="btn btn-primary btn-block" id="authSubmitBtn" data-mode="login">ログイン</button>
+          </div>
+
+          <!-- Logged in -->
+          <div id="loggedInSection" class="hidden">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+              <span style="font-size:1.2rem;">👤</span>
+              <span id="loggedInEmail" style="font-size:0.85rem;color:var(--gray-700);"></span>
+            </div>
+            <div style="display:flex;gap:0.5rem;">
+              <button class="btn btn-primary" id="syncNowBtn" style="flex:1;">🔄 今すぐ同期</button>
+              <button class="btn btn-secondary" id="logoutBtn" style="flex:1;">ログアウト</button>
+            </div>
+            <p id="lastSyncTime" style="font-size:0.75rem;color:var(--gray-500);margin-top:0.5rem;"></p>
+          </div>
+        </div>
+
+        <!-- Export / Import -->
+        <div class="setting-item"
+          style="margin-bottom: 2rem; background:var(--gray-50); padding:1rem; border-radius:var(--radius-md);">
+          <h3 style="font-size:1rem;margin-bottom:0.5rem;">📁 データ管理</h3>
+          <p style="margin-bottom:1rem;font-size:0.8rem;color:var(--gray-600);">
+            JSON形式でデータの書き出し・読み込みができます。
+          </p>
+          <button class="btn btn-primary btn-block" id="exportDataBtn" style="margin-bottom:0.5rem;">データを書き出す</button>
+          <input type="file" id="importFileInput" accept=".json,application/json,text/plain" style="display:none">
+          <button class="btn btn-secondary btn-block" id="importDataBtn">ファイルを読み込む</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
 
   <!-- Dexie.js for IndexedDB -->
   <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="db.js"></script>
+  <script src="supabase-sync.js"></script>
   <script src="app.js"></script>
 </body>
 

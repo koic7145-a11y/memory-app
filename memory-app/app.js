@@ -34,6 +34,23 @@ class MemoryApp {
     this.populateDeckSelect();
     this.restoreLastCategory();
     this.render();
+
+    // --- Supabase Sync setup ---
+    if (typeof syncModule !== 'undefined') {
+      syncModule.onSyncStatusChange = (status) => this.updateSyncUI(status);
+      syncModule.onDataChange = async () => {
+        await this.loadData();
+        await this.loadDecks();
+        this.populateDeckSelect();
+        this.render();
+      };
+      // Restore session
+      const session = await syncModule.getSession();
+      if (session) {
+        this.updateAuthUI(true, syncModule.user.email);
+        syncModule.fullSync().then(() => syncModule.subscribeRealtime());
+      }
+    }
   }
 
   // --- Data Management ---
@@ -171,15 +188,20 @@ class MemoryApp {
       return null;
     }
 
+    const now = new Date().toISOString();
     const deck = {
       id: this.generateId(),
       name: name,
-      createdAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now,
+      synced: 0,
+      deleted: 0
     };
 
     try {
       await db.decks.add(deck);
       this.decks.push(deck);
+      if (typeof syncModule !== 'undefined') syncModule.markDeckDirty(deck.id);
       this.populateDeckSelect();
       document.getElementById('categorySelect').value = name;
       this.showToast(`デッキ「${name}」を作成しました`);
@@ -373,7 +395,156 @@ class MemoryApp {
       }
     });
 
+    // Settings / Data Management
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        document.getElementById('settingsModal').classList.add('active');
+      });
+    }
+    document.getElementById('settingsCloseBtn').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.remove('active');
+    });
+
+    document.getElementById('exportDataBtn').addEventListener('click', () => this.exportData());
+
+    const importBtn = document.getElementById('importDataBtn');
+    const fileInput = document.getElementById('importFileInput');
+    importBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        this.importData(e.target.files[0]);
+        e.target.value = ''; // Reset
+      }
+    });
+
+    document.getElementById('settingsModal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) {
+        document.getElementById('settingsModal').classList.remove('active');
+      }
+    });
+
+    // --- Auth / Sync Events ---
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    if (authSubmitBtn) {
+      // Set initial tab state
+      document.getElementById('authTabLogin').classList.add('btn-primary');
+
+      authSubmitBtn.addEventListener('click', async () => {
+        const email = document.getElementById('authEmail').value.trim();
+        const password = document.getElementById('authPassword').value;
+        const errEl = document.getElementById('authError');
+        errEl.style.display = 'none';
+
+        if (!email || !password) {
+          errEl.textContent = 'メールアドレスとパスワードを入力してください';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        const mode = authSubmitBtn.dataset.mode;
+        authSubmitBtn.disabled = true;
+        authSubmitBtn.textContent = '処理中...';
+
+        try {
+          let result;
+          if (mode === 'signup') {
+            const confirm = document.getElementById('authPasswordConfirm').value;
+            if (password !== confirm) {
+              errEl.textContent = 'パスワードが一致しません';
+              errEl.style.display = 'block';
+              return;
+            }
+            result = await syncModule.signUp(email, password);
+          } else {
+            result = await syncModule.signIn(email, password);
+          }
+
+          if (result.error) {
+            errEl.textContent = result.error.message;
+            errEl.style.display = 'block';
+          } else {
+            this.updateAuthUI(true, email);
+            this.showToast(mode === 'signup' ? 'アカウントを作成しました' : 'ログインしました');
+          }
+        } catch (e) {
+          errEl.textContent = 'エラーが発生しました';
+          errEl.style.display = 'block';
+        } finally {
+          authSubmitBtn.disabled = false;
+          authSubmitBtn.textContent = mode === 'signup' ? '新規登録' : 'ログイン';
+        }
+      });
+    }
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        await syncModule.signOut();
+        this.updateAuthUI(false);
+        this.showToast('ログアウトしました');
+      });
+    }
+
+    const syncNowBtn = document.getElementById('syncNowBtn');
+    if (syncNowBtn) {
+      syncNowBtn.addEventListener('click', async () => {
+        syncNowBtn.disabled = true;
+        syncNowBtn.textContent = '🔄 同期中...';
+        await syncModule.fullSync();
+        syncNowBtn.disabled = false;
+        syncNowBtn.textContent = '🔄 今すぐ同期';
+        this.showToast('同期が完了しました');
+        document.getElementById('lastSyncTime').textContent =
+          `最終同期: ${new Date().toLocaleTimeString('ja-JP')}`;
+      });
+    }
+
     this.checkStreakOnLoad();
+  }
+
+  // --- Sync UI Helpers ---
+
+  updateAuthUI(loggedIn, email) {
+    const formSection = document.getElementById('authFormSection');
+    const loggedSection = document.getElementById('loggedInSection');
+    if (!formSection || !loggedSection) return;
+
+    if (loggedIn) {
+      formSection.classList.add('hidden');
+      loggedSection.classList.remove('hidden');
+      document.getElementById('loggedInEmail').textContent = email || '';
+    } else {
+      formSection.classList.remove('hidden');
+      loggedSection.classList.add('hidden');
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+    }
+  }
+
+  updateSyncUI(status) {
+    const dot = document.querySelector('.sync-dot');
+    const text = document.getElementById('syncText');
+    if (!dot || !text) return;
+
+    dot.className = 'sync-dot';
+    switch (status) {
+      case 'synced':
+        dot.classList.add('synced');
+        text.textContent = '同期済';
+        break;
+      case 'syncing':
+        dot.classList.add('syncing');
+        text.textContent = '同期中';
+        break;
+      case 'error':
+        dot.classList.add('error');
+        text.textContent = 'エラー';
+        break;
+      default:
+        dot.classList.add('offline');
+        text.textContent = '未接続';
+    }
   }
 
   checkStreakOnLoad() {
@@ -549,6 +720,7 @@ class MemoryApp {
 
     const category = document.getElementById('categorySelect').value || '未分類';
 
+    const now = new Date().toISOString();
     const card = {
       id: this.generateId(),
       question: '',
@@ -562,7 +734,10 @@ class MemoryApp {
       repetitions: 0,
       nextReview: this.getTodayString(),
       reviewHistory: [],
-      createdAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now,
+      synced: 0,
+      deleted: 0
     };
 
     try {
@@ -570,6 +745,9 @@ class MemoryApp {
       this.cards.push(card);
       localStorage.setItem('lastCategory', category);
       this.showToast('カードを追加しました');
+
+      // Trigger sync
+      if (typeof syncModule !== 'undefined') syncModule.markCardDirty(card.id);
 
       const continuous = document.getElementById('continuousMode').checked;
       if (continuous) {
@@ -603,6 +781,11 @@ class MemoryApp {
     if (!confirm('このカードを削除しますか？')) return;
 
     try {
+      // Soft-delete for sync, then remove locally
+      await db.cards.update(id, { deleted: 1, synced: 0, updatedAt: new Date().toISOString() });
+      if (typeof syncModule !== 'undefined' && syncModule.isLoggedIn()) {
+        await syncModule.pushChanges();
+      }
       await db.cards.delete(id);
       this.cards = this.cards.filter(c => c.id !== id);
       this.render();
@@ -644,7 +827,10 @@ class MemoryApp {
     card.category = document.getElementById('editCategory').value;
 
     try {
+      card.updatedAt = new Date().toISOString();
+      card.synced = 0;
       await db.cards.put(card);
+      if (typeof syncModule !== 'undefined') syncModule.markCardDirty(card.id);
       this.closeEditModal();
       this.render();
       this.showToast('カードを更新しました');
@@ -880,7 +1066,10 @@ class MemoryApp {
     });
 
     try {
+      card.updatedAt = new Date().toISOString();
+      card.synced = 0;
       await db.cards.put(card);
+      if (typeof syncModule !== 'undefined') syncModule.markCardDirty(card.id);
       this.updateStreak();
 
       this.currentCardIndex++;
@@ -1157,6 +1346,103 @@ class MemoryApp {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  // --- Data Management ---
+
+  async exportData() {
+    try {
+      const data = {
+        cards: await db.cards.toArray(),
+        decks: await db.decks.toArray(),
+        exportDate: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+      // Try File System Access API (Save As) - allows picking iCloud/OneDrive directly
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: `memory-app-backup-${this.getDateString(new Date())}.json`,
+            types: [{
+              description: 'JSON File',
+              accept: { 'application/json': ['.json'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          this.showToast('データを保存しました');
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return; // User cancelled
+          console.warn('File System Access API failed, falling back to download', err);
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `memory-app-backup-${this.getDateString(new Date())}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      this.showToast('データを書き出しました');
+    } catch (e) {
+      console.error('Export failed:', e);
+      this.showToast('書き出しに失敗しました');
+    }
+  }
+
+  async importData(file) {
+    if (!file) return;
+
+    if (!confirm('現在のデータに追加・上書きされます。よろしいですか？')) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const json = e.target.result;
+        const data = JSON.parse(json);
+
+        if (!data.cards || !data.decks) {
+          throw new Error('無効なデータ形式です');
+        }
+
+        await db.transaction('rw', db.cards, db.decks, async () => {
+          // Import Decks
+          if (data.decks && Array.isArray(data.decks)) {
+            for (const deck of data.decks) {
+              await db.decks.put(deck);
+            }
+          }
+
+          // Import Cards
+          if (data.cards && Array.isArray(data.cards)) {
+            for (const card of data.cards) {
+              await db.cards.put(card);
+            }
+          }
+        });
+
+        this.showToast('データを読み込みました');
+
+        // Reload app data
+        await this.loadData();
+        await this.loadDecks();
+        this.render();
+
+      } catch (err) {
+        console.error('Import failed:', err);
+        this.showToast('読み込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
   }
 
   showToast(message) {
