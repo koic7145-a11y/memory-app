@@ -23,6 +23,7 @@ class SupabaseSync {
 
     // ─── Initialize Supabase Client ───
     _init() {
+        console.log('[Sync] Initializing Supabase Sync Module v5.1');
         if (typeof supabase === 'undefined' || !supabase.createClient) {
             console.warn('Supabase SDK not loaded. Sync disabled.');
             return;
