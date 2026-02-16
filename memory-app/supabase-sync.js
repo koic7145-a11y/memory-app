@@ -87,26 +87,6 @@ class SupabaseSync {
         this._setSyncStatus('offline');
     }
 
-    async deleteAccount() {
-        if (!this.client || !this.user) return { error: { message: '未ログイン' } };
-        try {
-            // Call server-side function to delete user data + auth account
-            const { error } = await this.client.rpc('delete_user');
-            if (error) return { error };
-
-            // Clear local data
-            await db.cards.clear();
-            await db.decks.clear();
-
-            this.unsubscribeRealtime();
-            this.user = null;
-            this._setSyncStatus('offline');
-            return { error: null };
-        } catch (e) {
-            return { error: { message: e.message } };
-        }
-    }
-
     async getSession() {
         if (!this.client) return null;
         const { data } = await this.client.auth.getSession();
