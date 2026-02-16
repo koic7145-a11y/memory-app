@@ -500,6 +500,34 @@ class MemoryApp {
       });
     }
 
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+    if (deleteAccountBtn) {
+      deleteAccountBtn.addEventListener('click', async () => {
+        if (!confirm('本当にアカウントを削除しますか？\nすべてのデータが完全に削除され、元に戻せません。')) return;
+        const confirmText = prompt('確認のため「削除」と入力してください：');
+        if (confirmText !== '削除') {
+          this.showToast('削除をキャンセルしました');
+          return;
+        }
+
+        deleteAccountBtn.disabled = true;
+        deleteAccountBtn.textContent = '削除中...';
+
+        const { error } = await syncModule.deleteAccount();
+        if (error) {
+          this.showToast('削除に失敗しました: ' + error.message);
+          deleteAccountBtn.disabled = false;
+          deleteAccountBtn.textContent = '🗑️ アカウントを削除';
+        } else {
+          this.updateAuthUI(false);
+          this.cards = [];
+          this.decks = [];
+          this.render();
+          this.showToast('アカウントを削除しました');
+        }
+      });
+    }
+
     this.checkStreakOnLoad();
   }
 
