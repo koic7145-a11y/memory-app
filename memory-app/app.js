@@ -489,26 +489,41 @@ class MemoryApp {
       });
     }
 
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', async () => {
-        await syncModule.signOut();
-        this.updateAuthUI(false);
-        this.showToast('ログアウトしました');
+    // --- Header Actions ---
+    const headerSyncBtn = document.getElementById('headerSyncBtn');
+    if (headerSyncBtn) {
+      headerSyncBtn.addEventListener('click', async () => {
+        if (!syncModule.isLoggedIn()) {
+          this.showToast('ログインしていません。設定からログインしてください。');
+          return;
+        }
+
+        // Simple animation/feedback
+        const icon = headerSyncBtn.querySelector('svg');
+        icon.style.transition = 'transform 1s';
+        icon.style.transform = 'rotate(360deg)';
+
+        await syncModule.fullSync();
+        this.showToast('同期が完了しました');
+        const lastSyncEl = document.getElementById('lastSyncTime');
+        if (lastSyncEl) {
+          lastSyncEl.textContent = `最終同期: ${new Date().toLocaleTimeString('ja-JP')}`;
+        }
+
+        setTimeout(() => {
+          icon.style.transform = 'none';
+        }, 1000);
       });
     }
 
-    const syncNowBtn = document.getElementById('syncNowBtn');
-    if (syncNowBtn) {
-      syncNowBtn.addEventListener('click', async () => {
-        syncNowBtn.disabled = true;
-        syncNowBtn.textContent = '🔄 同期中...';
-        await syncModule.fullSync();
-        syncNowBtn.disabled = false;
-        syncNowBtn.textContent = '🔄 今すぐ同期';
-        this.showToast('同期が完了しました');
-        document.getElementById('lastSyncTime').textContent =
-          `最終同期: ${new Date().toLocaleTimeString('ja-JP')}`;
+    const headerLogoutBtn = document.getElementById('headerLogoutBtn');
+    if (headerLogoutBtn) {
+      headerLogoutBtn.addEventListener('click', async () => {
+        if (confirm('ログアウトしますか？')) {
+          await syncModule.signOut();
+          this.updateAuthUI(false);
+          this.showToast('ログアウトしました');
+        }
       });
     }
 
@@ -531,6 +546,13 @@ class MemoryApp {
       loggedSection.classList.add('hidden');
       document.getElementById('authEmail').value = '';
       document.getElementById('authPassword').value = '';
+    }
+
+    // Toggle Header Logout Button
+    const headerLogoutBtn = document.getElementById('headerLogoutBtn');
+    if (headerLogoutBtn) {
+      if (loggedIn) headerLogoutBtn.classList.remove('hidden');
+      else headerLogoutBtn.classList.add('hidden');
     }
   }
 

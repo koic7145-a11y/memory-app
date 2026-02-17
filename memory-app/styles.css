@@ -25,6 +25,10 @@
   --transition: 0.2s ease;
 }
 
+.hidden {
+  display: none !important;
+}
+
 /* --- Reset & Base --- */
 *,
 *::before,

@@ -35,6 +35,22 @@
           <span class="sync-dot offline"></span>
           <span class="sync-text" id="syncText">未接続</span>
         </span>
+        <button class="btn-icon" id="headerSyncBtn" aria-label="同期" title="同期">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 1 8.51 15"></path>
+          </svg>
+        </button>
+        <button class="btn-icon hidden" id="headerLogoutBtn" aria-label="ログアウト" title="ログアウト">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
         <button class="btn-icon" id="settingsBtn" aria-label="設定">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -432,10 +448,11 @@
               <span style="font-size:1.2rem;">👤</span>
               <span id="loggedInEmail" style="font-size:0.85rem;color:var(--gray-700);"></span>
             </div>
-            <div style="display:flex;gap:0.5rem;">
-              <button class="btn btn-primary" id="syncNowBtn" style="flex:1;">🔄 今すぐ同期</button>
-              <button class="btn btn-secondary" id="logoutBtn" style="flex:1;">ログアウト</button>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+              <span style="font-size:1.2rem;">👤</span>
+              <span id="loggedInEmail" style="font-size:0.85rem;color:var(--gray-700);"></span>
             </div>
+            <!-- 同期・ログアウトボタンはヘッダーに移動しました -->
             <p id="lastSyncTime" style="font-size:0.75rem;color:var(--gray-500);margin-top:0.5rem;"></p>
           </div>
         </div>
